@@ -1,56 +1,76 @@
-;PROGRAMA EXEMPLO PARA O GRAVADOR GBootR POR: Ricardo Andrade Rossa
+; ---------------------------------------------------------
+; Programa principal
+; ---------------------------------------------------------
+ORG 0x7C00		  ; Origem do código em 7C00
 
-ORG 7C00h	      ; Lugar de ORG para a BIOS
-   Jmp	 Inicio       ; Salta para o inicio do programa
-   Nop
+   ; Cebecalho para compatibilidade com MS-DOS FAT12
+   jmp	   inicio
+   nop
+   db	   'RMT OS  '	   ; 8-bytes para o nome
+   dw	   512		   ; tamanho do setor em bytes
+   db	   1		   ; setores por cluster
+   dw	   1		   ; clusters reservados
+   db	   2		   ; numero de FATs
+   dw	   224		   ; entrada do diretorio principal
+   dw	   2880 	   ; total de setores
+   db	   0F0h 	   ; formato
+   dw	   9		   ; setores por FAT
+   dw	   18		   ; setores por trilha
+   dw	   2		   ; lados
+   dd	   0		   ; setores ocultos
+   dd	   0		   ; mais setores
+   db	   0		   ; Id do driver
+   db	   0		   ; reservado
+   db	   4		   ; assinatura de boot
+   dd	   0FFFFFFFFh	   ; numero do volume serial
+   db	   'NO NAME    '   ; nome do label (11 bytes)
+   db	   'FAT12   '	   ; sistema de arquivo (8 bytes)
 
-; DADOS DO DISCO
+inicio:
+   ; Configurar a pilha.
+   cli			; Disabilitar interrupções
+   mov ax, 0x9000		; Por a pilha em 9000:0000
+   mov ss, ax		; Transferir o endereço para o registrador do segmento da pilha (SS)
+   mov sp, 0		; Zerar ponteiro do topo da pilha
+   sti			; Habilitar interrupções (SeT Interrupts bit)
 
-DB '        '	      ; Label do disco
-DW 512		      ; Bytes por setor
-DB 1		      ; Setor por Bloco
-DW 1		      ; Tamanho do boot nos setores
-DB 2		      ; Numero de copias da FAT
-DW 224		      ; Entradas do diretorio
-DW 2880 	      ; Numero de setores (16-Bit)
-DB 0F0h 	      ; Descritor de midia
-DW 9		      ; Setores por FAT
-DW 18		      ; Setores por Cilindro
-DW 2		      ; Cabecas
-DD 0		      ; Setores invisiveis
-DD 0		      ; Numero de setores (32-Bit)
-DB 0		      ; Disco 0
-DB 0		      ; Reservado
-DB 029h 	      ; Assinatura de boot
-DD 0		      ; Volume
-DB 'EXEMPLO'	      ; Nome do volume
-DB '        '	      ; Tipo do sistema de arquivo(FAT)
+   mov [bootdrv], dl	; DL indica o drive de boot
+   call carregar		; Chamar a função que reseta a controladora
+			; e faz a leitura de setores do disco
+   jmp far 1000h:0		; Salta para o buffer com o código
 
-Inicio: 	      ; Procedimento do inicio do Boot
-   Mov	 AX,0	      ; Zera o AX
-   Mov	 SS,AX	      ; Zera o SS - SS := AX(0)
-   Mov	 SP,7C00h     ; Local do Boot (ORG)
-   Push  SS	      ; Grava o SS
-   Pop	 DS	      ; Pega o DS
-   Mov	 SI,mensagem  ; SI := Mensagem
-   Call  Escreva      ; Escreve a mensagem
-   Jmp	 $	      ; Trava
+; ---------------------------------------------------------
+; Funções e variáveis do bootstrap
+; ---------------------------------------------------------
 
-Escreva:
-   LodSB	      ; Copia o byte em DS:SI para AL e incrementa SI
-   Cmp	 AL,0	      ; E fim do texto? byte = 0
-   Je	 Volta	      ; Se Sim, volta
-   Mov	 AH,0Eh       ; Funcao 0E - Escreve texto
-   Int	 10h	      ; BIOS - Tela
-   Jmp	 Escreva      ; Proximo caracter
+bootdrv db 0		; A identificação do drive de boot
 
-Volta:
-   Retn 	      ; Volta
+carregar:
+   push ds		; Preserva o valor do segmento de dados na pilha
 
-Cor DB 1
-PosX DW 5
-PosY DW 5
+.reset:
+   mov ax, 0		; Serviço que reseta o sistema de disco
+   mov dl, [bootdrv]	; Drive que deve ser resetado
+   int 13h		; INT 13 faz o reset
+   jc .reset		; Falhou -> Tentar novamente (jc=jump on carry)
 
-mensagem  DB 13,10,'================================= RMT-Software =================================',0
-	  RB 510 + 7C00h -$   ; Preenche com zeros
-	  DB 55h,0AAh	      ; Assinatura do Boot
+   pop ds			; Retoma o valor do segmento de dados da pilha
+
+.leitura:
+   mov ax,0x1000		; O buffer deve ficar em 1000:0000
+   mov es,ax		; Transfere 1000 para ES (Extra Segment)
+   mov bx, 0		; e transfere 0 de deslocamento para BX
+			; O resultado é ES:BX com 1000:0000
+
+   mov ah, 2		; Serviço 2 da INT 13 => Ler setores de disco
+   mov al, 5		; Ler 5 setores (é mais do que suficiente)
+   mov cx, 2		; Cilindro=0, Setor=2
+   mov dh, 0		; Cabeça=0
+   mov dl, [bootdrv]	; Drive=drive de boot
+   int 13h		; Leia! ES:BX = dados do disco
+   jc .leitura		; falhou -> Tente novamente
+
+   retn 		; Terminada a leitura, retornar
+
+times 512-($-$$)-2 db 0 ; Preenche com 0 até setor ter 512 bytes
+   dw 0AA55h		; Põe a assinatura do setor de boot
