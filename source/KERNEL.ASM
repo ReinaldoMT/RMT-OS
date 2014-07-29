@@ -26,7 +26,7 @@ SystemLoop:			; Apenas pendura
 
 .exec:
    ; Compara o buffer com os comandos do sistema
-   include 'COMMANDS.ASM'
+   include 'commands.asm'
 
    jmp	 .end1		     ; salta para end1
 ;-------------------------------------------------
@@ -130,6 +130,19 @@ cls:
    ret
 
 ;------------------------------------------------------------------------------
+; textMode - Muda para o modo texto
+;------------------------------------------------------------------------------
+textMode:
+   ; Coloca o segmento de dados em 1000h
+   MOV	 AX, 1000h	     ; Põe endereço em AX
+   MOV	 DS, AX 	     ; Atualiza o segmento de dados
+   MOV	 ES, AX 	     ; Atualiza o segmento extra
+   XOR	 BX, BX 	     ; BX = 0
+   ; Volta para modo texto
+   MOV	 AX, 0x0003
+   INT	 0x10
+   ret
+;------------------------------------------------------------------------------
 ; write - Escreve uma string terminada em 0
 ; (SI=ponteiro para a string)
 ;------------------------------------------------------------------------------
@@ -155,29 +168,22 @@ write:
 volta:
    ret			     ; Terminada a tarefa, voltar ao ponto de chamada
 
-
 fim:
+
 ;------------------------------------------------------------------------------
 ; -> VARIAVEIS E COSTANTES ****************************************************
 ;------------------------------------------------------------------------------
-StrSystemVer db ' RMT OS - Ver: 0.01 BR',13,10,' RMT Software Brasil - 2005 (http://www.rmtsoftware.com.br)',13,10,0
-StrCmdNotFound db 13,10,'   Comando n',132,'o reconhecido pelo sistema, digite <help> para obter ajuda.',0
+include   'lang.asm'
 
-StrHelpMessage db 13,10, ' ------------------------------------------  '
-	       db 13,10, ' Ajuda do RMT OS'
-	       db 13,10, '   cls    -> Limpa a tela'
-	       db 13,10, '   help   -> Exibe esta tela de ajuda'
-	       db 13,10, '   reboot -> Reinicia o computador'
-	       db 13,10, ' ------------------------------------------  ',13,10,0
-
-salto  db 13d,10d,0
-
-cmd	db '';
+salto	  db 13d,10d,0
+cmd	  db '';
 ; Comandos
 cmdCLS	  db 'cls',0
 cmdHELP   db 'help',0
 cmdREBOOT db 'reboot',0
+cmdRUN	  db 'run',0
+cmdVER	  db 'ver',0
 
 lowercase=0100000b
 
-times 1024-($-$$) db 0 ; Preenche com 0 até setor ter 512 bytes
+times 2048-($-$$) db 0 ; Preenche com 0 até setor ter 2048 bytes

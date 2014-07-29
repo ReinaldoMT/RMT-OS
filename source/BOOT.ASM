@@ -24,11 +24,11 @@ ORG 0x7C00		  ; Origem do código em 7C00
    db	   4		   ; assinatura de boot
    dd	   0FFFFFFFFh	   ; numero do volume serial
    db	   'NO NAME    '   ; nome do label (11 bytes)
-   db	   'FAT12   '	   ; sistema de arquivo (8 bytes)
+   db	   'FAT12   ',0,0  ; sistema de arquivo (8 bytes)
 
 inicio:
    ; Configurar a pilha.
-   cli			; Disabilitar interrupções
+   cli			; Desabilitar interrupções
    mov ax, 0x9000		; Por a pilha em 9000:0000
    mov ss, ax		; Transferir o endereço para o registrador do segmento da pilha (SS)
    mov sp, 0		; Zerar ponteiro do topo da pilha
