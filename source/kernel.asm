@@ -186,4 +186,8 @@ cmdVER	  db 'ver',0
 
 lowercase=0100000b
 
-times 2048-($-$$) db 0 ; Preenche com 0 até setor ter 2048 bytes
+;times 2048-($-$$) db 0 ; Preenche com 0 até setor ter 2048 bytes
+
+; fill rest of binary image to 1.44MB, to make disk image.
+
+times 512 - ($ - $$) db 0
